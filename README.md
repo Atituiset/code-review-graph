@@ -107,13 +107,13 @@ Large monorepos are where token waste is most painful. The graph cuts through th
   <img src="diagrams/diagram6_monorepo_funnel.png" alt="Next.js monorepo: 27,732 files funnelled through code-review-graph down to ~15 files — 49x fewer tokens" width="80%" />
 </p>
 
-### 24 languages + Jupyter notebooks
+### Broad language coverage + Jupyter notebooks
 
 <p align="center">
-  <img src="diagrams/diagram9_language_coverage.png" alt="24 languages organized by category: Web, Backend, Systems, Mobile, Scripting, Config (Nix), plus Jupyter/Databricks notebook support" width="90%" />
+  <img src="diagrams/diagram9_language_coverage.png" alt="Language coverage organized by category: Web, Backend, Systems, Mobile, Scripting, Config, plus Jupyter and Databricks notebook support" width="90%" />
 </p>
 
-Full Tree-sitter grammar support for functions, classes, imports, call sites, inheritance, and test detection in every language. Includes Zig, PowerShell, Julia, Svelte SFC, and flake-aware Nix support. Plus Jupyter/Databricks notebook parsing (`.ipynb`) with multi-language cell support (Python, R, SQL), and Perl XS files (`.xs`).
+Full Tree-sitter grammar support for functions, classes, imports, call sites, inheritance, and test detection across the parser surface. Current support includes Python, JavaScript/TypeScript/TSX, Go, Rust, Java, C/C++, C#, Ruby, Kotlin, Swift, PHP, Scala, Solidity, Dart, R, Perl, Lua/Luau, Objective-C, shell scripts, Elixir, Zig, PowerShell, Julia, ReScript, GDScript, Nix, Verilog/SystemVerilog, SQL, Vue/Svelte SFCs, Jupyter/Databricks notebooks (`.ipynb`), and Perl XS files (`.xs`).
 
 ---
 
@@ -130,6 +130,8 @@ All numbers come from the automated evaluation runner against 6 real open-source
 <br>
 
 The graph replaces reading entire source files with a compact structural context covering blast radius, dependency chains, and test coverage gaps.
+
+In v2.3.4, review and impact tools also return a compact `context_savings` estimate so MCP clients and CLI users can see the approximate context saved without adding bulky before/after dumps. The value is deliberately labelled estimated because it uses a conservative character-count approximation rather than model-specific tokenization.
 
 | Repo | Commits | Avg Naive Tokens | Avg Graph Tokens | Reduction |
 |------|--------:|-----------------:|----------------:|----------:|
@@ -195,7 +197,7 @@ The blast-radius analysis never misses an actually impacted file (perfect recall
 | Feature | Details |
 |---------|---------|
 | **Incremental updates** | Re-parses only changed files. Subsequent updates complete in under 2 seconds. |
-| **24 languages + notebooks** | Python, TypeScript/TSX, JavaScript, Vue, Svelte, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++, Dart, R, Perl, Lua, Zig, PowerShell, Julia, Nix, Jupyter/Databricks (.ipynb) |
+| **Broad language + notebook support** | Python, JavaScript/TypeScript/TSX, Go, Rust, Java, C/C++, C#, Ruby, Kotlin, Swift, PHP, Scala, Solidity, Dart, R, Perl, Lua/Luau, Objective-C, shell scripts, Elixir, Zig, PowerShell, Julia, ReScript, GDScript, Nix, Verilog/SystemVerilog, SQL, Vue/Svelte SFCs, Jupyter/Databricks (.ipynb), and Perl XS (.xs) |
 | **Blast-radius analysis** | Shows exactly which functions, classes, and files are affected by any change |
 | **Auto-update hooks** | Graph updates on every file edit and git commit without manual intervention |
 | **Semantic search** | Optional vector embeddings via sentence-transformers, Google Gemini, MiniMax, or any OpenAI-compatible endpoint (real OpenAI, Azure, new-api, LiteLLM, vLLM, LocalAI) |
@@ -209,6 +211,7 @@ The blast-radius analysis never misses an actually impacted file (perfect recall
 | **Export formats** | GraphML (Gephi/yEd), Neo4j Cypher, Obsidian vault with wikilinks, SVG static graph |
 | **Graph diff** | Compare graph snapshots over time: new/removed nodes, edges, community changes |
 | **Token benchmarking** | Measure naive full-corpus tokens vs graph query tokens with per-question ratios |
+| **Estimated context savings** | Compact `context_savings` metadata on relevant MCP/CLI review outputs, labelled as estimated and kept to three small fields |
 | **Memory loop** | Persist Q&A results as markdown for re-ingestion, so the graph grows from queries |
 | **Community auto-split** | Oversized communities (>25% of graph) are recursively split via Leiden |
 | **Execution flows** | Trace call chains from entry points, sorted by weighted criticality |

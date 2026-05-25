@@ -19,7 +19,7 @@ Review a PR or branch diff.
 - Full impact analysis across all PR commits
 - Structured output with risk assessment
 
-## MCP Tools (22 total)
+## MCP Tools
 
 ### Core Tools
 
@@ -37,6 +37,7 @@ max_depth: int = 2               # Hops in graph
 repo_root: str | None
 base: str = "HEAD~1"
 ```
+Relevant responses may include compact estimated `context_savings` metadata.
 
 #### `query_graph_tool`
 ```
@@ -55,6 +56,7 @@ max_lines_per_file: int = 200
 repo_root: str | None
 base: str = "HEAD~1"
 ```
+Relevant responses may include compact estimated `context_savings` metadata.
 
 #### `semantic_search_nodes_tool`
 ```
@@ -136,7 +138,9 @@ repo_root: str | None
 #### `get_architecture_overview_tool`
 ```
 repo_root: str | None
+detail_level: str = "minimal"    # "minimal" compact default, "standard" full detail
 ```
+Minimal responses may include compact estimated `context_savings` metadata.
 
 ### Change Analysis and Refactoring Tools
 
@@ -149,6 +153,7 @@ max_depth: int = 2
 repo_root: str | None
 ```
 Primary tool for code review. Maps git diffs to affected functions, flows, communities, and test coverage gaps. Returns risk scores and prioritized review items.
+Relevant responses may include compact estimated `context_savings` metadata.
 
 #### `refactor_tool`
 ```
