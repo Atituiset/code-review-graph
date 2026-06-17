@@ -1,83 +1,83 @@
-# Troubleshooting
+# 故障排查
 
-## Quick reference for common install/setup problems
+## 安装/设置常见问题快速参考
 
-Four issues account for most support questions. Check these first:
+四个问题占了大半支持请求。先检查这些：
 
-### 1. `Hooks use a matcher + hooks array` error in `.claude/settings.json`
+### 1. `.claude/settings.json` 中出现 `Hooks use a matcher + hooks array` 错误
 
-**You're on a pre-v2.2.3 release.** v2.2.1 and v2.2.2 shipped a broken hook schema — flat `{matcher, command, timeout}` entries without the required nested `hooks: []` array, timeouts in milliseconds instead of seconds, and a `PreCommit` event that isn't a real Claude Code event. PR #208 (shipped in v2.2.3) rewrote the generator to emit the correct v1.x+ schema.
+**你使用的是 v2.2.3 之前的版本。** v2.2.1 和 v2.2.2 发布了损坏的钩子 schema——扁平的 `{matcher, command, timeout}` 条目，没有所需的嵌套 `hooks: []` 数组，超时以毫秒而非秒为单位，以及一个不是真正 Claude Code 事件的 `PreCommit` 事件。PR #208（v2.2.3 发布）重写了生成器以输出正确的 v1.x+ schema。
 
-**Fix:**
+**修复：**
 
 ```bash
-pip install --upgrade code-review-graph   # → v2.2.4 or later
+pip install --upgrade code-review-graph   # → v2.2.4 或更高
 cd /path/to/your/project
-code-review-graph install                 # rewrites .claude/settings.json
+code-review-graph install                 # 重写 .claude/settings.json
 ```
 
-The re-install merge-replaces the entire broken `hooks` block with the new nested format and drops a real git pre-commit hook into the hooks directory resolved via `git rev-parse --git-path hooks` — typically `.git/hooks/pre-commit`, but linked worktrees and `core.hooksPath` (husky) setups are handled too. That's where "check before commit" lives in v2.2.3+, not in Claude Code settings.
+重新安装会合并替换整个损坏的 `hooks` 块为新的嵌套格式，并在通过 `git rev-parse --git-path hooks` 解析的钩子目录中放置一个真正的 git pre-commit 钩子——通常是 `.git/hooks/pre-commit`，但链接的 worktree 和 `core.hooksPath`（husky）配置也能处理。v2.2.3+ 中 "提交前检查" 存在于那里，而非 Claude Code 设置中。
 
-Valid Claude Code hook events are: `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SubagentStop`, `SessionStart`, `SessionEnd`, `PreCompact`, `Notification`. There is no `PreCommit`.
+有效的 Claude Code 钩子事件有：`PreToolUse`、`PostToolUse`、`UserPromptSubmit`、`Stop`、`SubagentStop`、`SessionStart`、`SessionEnd`、`PreCompact`、`Notification`。没有 `PreCommit`。
 
-### 2. `code-review-graph: command not found` after `pip install`
+### 2. `pip install` 后出现 `code-review-graph: command not found`
 
-`pip install` put the console script into a `bin/` directory that isn't on your `$PATH`. Four fixes, in order of recommendation:
+`pip install` 将控制台脚本放在不在你 `$PATH` 上的 `bin/` 目录中。四个修复方法，按推荐顺序：
 
-**Option 1 — Use `pipx` (cleanest):**
+**选项 1 — 使用 `pipx`（最干净）：**
 
 ```bash
 pip uninstall code-review-graph
 pipx install code-review-graph
 ```
 
-`pipx` installs CLI tools in an isolated venv. If the command is not found afterwards, run `pipx ensurepath` or add `~/.local/bin` to your PATH.
+`pipx` 在隔离的 venv 中安装 CLI 工具。如果之后还找不到命令，运行 `pipx ensurepath` 或将 `~/.local/bin` 添加到你的 PATH。
 
-**Option 2 — Use `uvx` (no install needed):**
+**选项 2 — 使用 `uvx`（无需安装）：**
 
 ```bash
 uvx code-review-graph install
 uvx code-review-graph build
 ```
 
-**Option 3 — Run it as a Python module (always works):**
+**选项 3 — 作为 Python 模块运行（始终有效）：**
 
 ```bash
 python -m code_review_graph install
 python -m code_review_graph build
 ```
 
-**Option 4 — Fix PATH manually:**
+**选项 4 — 手动修复 PATH：**
 
 ```bash
 pip show code-review-graph | grep Location
-# Find the sibling `bin/` directory; on macOS user installs this is
-# typically ~/Library/Python/3.X/bin. Add it to your shell rc:
+# 找到相邻的 `bin/` 目录；macOS 用户安装通常是
+# ~/Library/Python/3.X/bin。添加到你的 shell rc：
 echo 'export PATH="$HOME/Library/Python/3.12/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-### 3. Is code-review-graph project-scoped or user-scoped?
+### 3. code-review-graph 是项目范围还是用户范围？
 
-**Both** — four different pieces, each scoped differently:
+**两者都是**——四个不同的部分，各有不同的范围：
 
-| Piece                         | Scope          | Where                                                            |
-|-------------------------------|----------------|------------------------------------------------------------------|
-| The Python package            | User-scoped    | Install once via `pip`/`pipx`/`uvx`                              |
-| The graph database            | Project-scoped | `.code-review-graph/graph.db` inside each project                |
-| MCP server config (`.mcp.json`) | Project-scoped | Claude Code launches one MCP server per project, with `cwd=<project>` |
-| Multi-repo registry           | User-scoped    | `~/.code-review-graph/registry.json` (only for `cross_repo_search`) |
+| 部分 | 范围 | 位置 |
+|------|------|------|
+| Python 包 | 用户范围 | 通过 `pip`/`pipx`/`uvx` 安装一次 |
+| 图谱数据库 | 项目范围 | 每个项目内的 `.code-review-graph/graph.db` |
+| MCP 服务器配置 (`.mcp.json`) | 项目范围 | Claude Code 每项目启动一个 MCP 服务器，`cwd=<project>` |
+| 多仓库注册表 | 用户范围 | `~/.code-review-graph/registry.json`（仅用于 `cross_repo_search`） |
 
-**TL;DR**: install the tool **once**, then run `code-review-graph install && code-review-graph build` inside **each** project you want graph-aware reviews in.
+**简而言之**：安装工具**一次**，然后在**每个**你要图谱感知审查的项目中运行 `code-review-graph install && code-review-graph build`。
 
-### 4. Using a venv? You must update `settings.json` manually
+### 4. 使用 venv？你必须手动更新 `settings.json`
 
-Claude Code hooks and MCP tool paths in `.claude/settings.json` are **hardcoded at install time**. If you switch to (or create) a virtual environment after running `code-review-graph install`, the paths will still point to the old interpreter and the server will silently fail or use the wrong Python.
+Claude Code 钩子和 `.claude/settings.json` 中的 MCP 工具路径在**安装时硬编码**。如果你在运行 `code-review-graph install` 后切换到（或创建）虚拟环境，路径仍然指向旧的解释器，服务器会静默失败或使用错误的 Python。
 
-**Fix — update the `command`/`args` in `.mcp.json` and any hook commands in `.claude/settings.json` to match your venv:**
+**修复 — 更新 `.mcp.json` 中的 `command`/`args` 和 `.claude/settings.json` 中的任何钩子命令以匹配你的 venv：**
 
 ```json
-// .mcp.json — point to your venv's Python or uvx inside the venv
+// .mcp.json — 指向你的 venv 的 Python 或 venv 中的 uvx
 {
   "mcpServers": {
     "code-review-graph": {
@@ -88,103 +88,103 @@ Claude Code hooks and MCP tool paths in `.claude/settings.json` are **hardcoded 
 }
 ```
 
-Or simply re-run `code-review-graph install` **from within the activated venv** so the paths are regenerated correctly:
+或者直接从激活的 venv 中重新运行 `code-review-graph install`，这样路径会正确重新生成：
 
 ```bash
-source .venv/bin/activate          # activate your venv first
-code-review-graph install          # rewrites .mcp.json and hook paths
+source .venv/bin/activate          # 先激活你的 venv
+code-review-graph install          # 重写 .mcp.json 和钩子路径
 ```
 
-Then fully quit and reopen Claude Code so it picks up the new config.
+然后完全退出并重新打开 Claude Code，让它获取新配置。
 
-### 5. "I built the graph but Claude Code doesn't see it in a new session"
+### 5. "我构建了图谱但 Claude Code 在新会话中看不到"
 
-Most likely causes, ranked:
+最可能的原因，按排名：
 
-1. **You didn't restart Claude Code after `install`.** Claude Code reads `.mcp.json` at startup — if you ran `install` in one session, fully quit and reopen Claude Code for the MCP server to register.
-2. **New session's `cwd` is a different directory.** The MCP server is launched with `cwd=<project>` and it reads `.code-review-graph/graph.db` from there. If your new session opened in a parent folder or a different project, it won't find the graph you built.
-3. **You ran `build` but not `install`.** `build` creates `graph.db`; `install` is what registers the MCP server with Claude Code via `.mcp.json`. You need both.
-4. **MCP server is crashing on startup.** Run `/mcp` inside Claude Code to see server status, or check `~/Library/Logs/Claude/mcp*.log` on macOS.
+1. **你没在 `install` 后重启 Claude Code。** Claude Code 在启动时读取 `.mcp.json`——如果你在一个会话中运行了 `install`，完全退出并重新打开 Claude Code 才能注册 MCP 服务器。
+2. **新会话的 `cwd` 是不同目录。** MCP 服务器以 `cwd=<project>` 启动并从那里读取 `.code-review-graph/graph.db`。如果新会话在父文件夹或不同项目中打开，它找不到你构建的图谱。
+3. **你运行了 `build` 但没运行 `install`。** `build` 创建 `graph.db`；`install` 是通过 `.mcp.json` 将 MCP 服务器注册到 Claude Code 的命令。两者都需要。
+4. **MCP 服务器启动时崩溃。** 在 Claude Code 中运行 `/mcp` 查看服务器状态，或在 macOS 上检查 `~/Library/Logs/Claude/mcp*.log`。
 
-**Quick checklist:**
+**快速检查清单：**
 
 ```bash
 cd /path/to/your/project
-code-review-graph status    # should print Files/Nodes/Edges from the built graph
-ls .mcp.json                # should exist
-cat .mcp.json               # should reference `code-review-graph serve`
-# then: fully quit Claude Code and reopen it inside this project
+code-review-graph status    # 应该打印已构建图谱的 Files/Nodes/Edges
+ls .mcp.json                # 应该存在
+cat .mcp.json               # 应该引用 `code-review-graph serve`
+# 然后：完全退出 Claude Code 并在此项目中重新打开
 ```
 
-If `status` shows the graph but `/mcp` in the new session doesn't list `code-review-graph`, the `.mcp.json` isn't in the session's `cwd` — re-run `code-review-graph install` from the correct project root.
+如果 `status` 显示图谱存在但新会话中 `/mcp` 没有列出 `code-review-graph`，`.mcp.json` 不在会话的 `cwd` 中——从正确的项目根目录重新运行 `code-review-graph install`。
 
 ---
 
-## Database lock errors
-The graph uses SQLite with WAL mode. If you see lock errors:
-- Ensure only one build process runs at a time
-- The database auto-recovers; just retry
-- Delete `.code-review-graph/graph.db-wal` and `.code-review-graph/graph.db-shm` if corrupt
+## 数据库锁错误
+图谱使用带 WAL 模式的 SQLite。如果你看到锁错误：
+- 确保同时只有一个构建进程运行
+- 数据库会自动恢复；重试即可
+- 如果损坏，删除 `.code-review-graph/graph.db-wal` 和 `.code-review-graph/graph.db-shm`
 
-## Large repositories (>10k files)
-- First build may take 30-60 seconds
-- Subsequent incremental updates are fast (<2s)
-- Add more ignore patterns to `.code-review-graphignore`:
+## 大型仓库（>10k 文件）
+- 首次构建可能需要 30-60 秒
+- 后续增量更新很快（<2s）
+- 向 `.code-review-graphignore` 添加更多忽略模式：
   ```
   generated/**
   vendor/**
   *.min.js
   ```
 
-## Missing nodes after build
-- Check that the file's language is supported (see [FEATURES.md](FEATURES.md))
-- Check that the file isn't matched by an ignore pattern
-- Run with `full_rebuild=True` to force a complete re-parse
+## 构建后节点缺失
+- 检查文件语言是否受支持（见 [FEATURES.md](FEATURES.md)）
+- 检查文件是否被忽略模式匹配
+- 使用 `full_rebuild=True` 强制完全重新解析
 
-## Graph seems stale
-- Hooks auto-update on edit/commit
-- If stale, run `/code-review-graph:build-graph` manually
-- Check that hooks are configured in `.claude/settings.json` (re-run `code-review-graph install` to regenerate)
+## 图谱似乎过期
+- 钩子在编辑/提交时自动更新
+- 如果过期，手动运行 `/code-review-graph:build-graph`
+- 检查 `.claude/settings.json` 中是否配置了钩子（重新运行 `code-review-graph install` 以重新生成）
 
-## Embeddings not working
-- Install with: `pip install code-review-graph[embeddings]`
-- Run `embed_graph_tool` to compute vectors
-- First embedding run downloads the model (~90MB, one time)
+## 嵌入不工作
+- 安装：`pip install code-review-graph[embeddings]`
+- 运行 `embed_graph_tool` 计算向量
+- 首次嵌入运行下载模型（~90MB，一次性）
 
-## MCP server won't start
-- Verify `uv` is installed (`uv --version`; install with `pip install uv` or `brew install uv`)
-- Check that `uvx code-review-graph serve` runs without errors
-- If using a custom `.mcp.json`, ensure it uses `"command": "uvx"` with `"args": ["code-review-graph", "serve"]`
-- Re-run `code-review-graph install` to regenerate the config
+## MCP 服务器无法启动
+- 验证 `uv` 已安装（`uv --version`；通过 `pip install uv` 或 `brew install uv` 安装）
+- 检查 `uvx code-review-graph serve` 运行无错
+- 如果使用自定义 `.mcp.json`，确保使用 `"command": "uvx"` 和 `"args": ["code-review-graph", "serve"]`
+- 重新运行 `code-review-graph install` 以重新生成配置
 
 ## Windows / WSL
 
-- Upgrade to v2.3.6+ if `daemon status` crashes with WinError 87 (#511) or CLI `detect-changes` maps 0 functions on Windows (#528) — both are fixed there
-- Use forward slashes in paths when passing `repo_root` to MCP tools
-- In WSL, ensure `uv` is installed inside WSL (not the Windows version): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- If `uv` is not found after install, add `~/.cargo/bin` to your PATH
-- File watching (`code-review-graph watch`) may have delays on WSL1 due to filesystem event limitations; WSL2 is recommended
-- On Windows native (non-WSL), long path support may need to be enabled: `git config --system core.longpaths true`
+- 升级到 v2.3.6+，如果 `daemon status` 因 WinError 87 崩溃（#511）或 CLI `detect-changes` 在 Windows 上映射 0 个函数（#528）——两者均已修复
+- 向 MCP 工具传递 `repo_root` 时路径使用正斜杠
+- 在 WSL 中，确保 `uv` 安装在 WSL 内部（不是 Windows 版本）：`curl -LsSf https://astral.sh/uv/install.sh | sh`
+- 如果安装后找不到 `uv`，将 `~/.cargo/bin` 添加到你的 PATH
+- 文件监视（`code-review-graph watch`）在 WSL1 上可能因文件系统事件限制有延迟；推荐 WSL2
+- 在 Windows 原生（非 WSL）上，可能需要启用长路径支持：`git config --system core.longpaths true`
 
-## Community detection requires igraph
+## 社区检测需要 igraph
 
-- Install with: `pip install code-review-graph[communities]`
-- Without igraph, community detection falls back to file-based grouping (less precise but functional)
+- 安装：`pip install code-review-graph[communities]`
+- 没有 igraph，社区检测回退到基于文件的分组（精度较低但可用）
 
-## Wiki generation with LLM summaries
+## 带 LLM 摘要的 Wiki 生成
 
-- Install with: `pip install code-review-graph[wiki]`
-- Requires a running Ollama instance for LLM-powered summaries
-- Without Ollama, wiki pages are generated with structural information only (no prose summaries)
+- 安装：`pip install code-review-graph[wiki]`
+- 需要运行中的 Ollama 实例用于 LLM 驱动的摘要
+- 没有 Ollama，Wiki 页面仅包含结构信息（无散文摘要）
 
-## Optional dependency groups
+## 可选依赖组
 
-If a tool returns an ImportError, install the relevant optional group:
-- `pip install code-review-graph[embeddings]` for semantic search
-- `pip install code-review-graph[google-embeddings]` for Google Gemini embeddings
-- OpenAI-compatible and MiniMax embeddings use stdlib HTTP clients and require only their environment variables
-- `pip install code-review-graph[communities]` for igraph-based community detection
-- `pip install code-review-graph[enrichment]` for Python call-resolution enrichment via Jedi
-- `pip install code-review-graph[eval]` for evaluation benchmarks (matplotlib)
-- `pip install code-review-graph[wiki]` for wiki LLM summaries (ollama)
-- `pip install code-review-graph[all]` for everything
+如果工具返回 ImportError，安装相关可选组：
+- `pip install code-review-graph[embeddings]` 用于语义搜索
+- `pip install code-review-graph[google-embeddings]` 用于 Google Gemini 嵌入
+- OpenAI 兼容和 MiniMax 嵌入使用标准库 HTTP 客户端，只需其环境变量
+- `pip install code-review-graph[communities]` 用于 igraph 社区检测
+- `pip install code-review-graph[enrichment]` 用于通过 Jedi 的 Python 调用解析富化
+- `pip install code-review-graph[eval]` 用于评估基准（matplotlib）
+- `pip install code-review-graph[wiki]` 用于 Wiki LLM 摘要（ollama）
+- `pip install code-review-graph[all]` 获取所有功能

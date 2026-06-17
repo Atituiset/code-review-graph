@@ -1,26 +1,16 @@
-# GitHub Action: Risk-Scored PR Review
+# GitHub Action：风险评分 PR 审查
 
-code-review-graph ships a composite GitHub Action (`action.yml` at the repo
-root) that posts a risk-scored, graph-aware review comment on every pull
-request — think of it as a hosted AI review bot (Greptile-style), except the
-analysis is **local-first**: the knowledge graph is built and queried entirely
-on your CI runner, and no source code is sent to any external service.
+code-review-graph 提供一个复合 GitHub Action（仓库根目录的 `action.yml`），在每个拉取请求上发布风险评分的图谱感知审查评论——可以把它看作一个托管的 AI 审查机器人（Greptile 风格），但分析是**本地优先**的：知识图谱完全在你的 CI 运行器上构建和查询，不向任何外部服务发送源代码。
 
-On each PR run the action:
+每个 PR 运行时，该操作会：
 
-1. Installs `code-review-graph` from PyPI.
-2. Restores the cached `.code-review-graph/` SQLite graph (or builds it from
-   scratch on a cache miss) and incrementally re-parses the files changed by
-   the PR.
-3. Runs `code-review-graph detect-changes --base origin/<base-branch>` to get
-   risk-scored functions, affected execution flows, and test gaps.
-4. Renders a markdown report (via `scripts/render_pr_comment.py`) and upserts
-   a single sticky PR comment — the same comment is updated on every push, so
-   the PR thread is never spammed.
-5. Optionally fails the job when the overall risk score crosses a threshold
-   (`fail-on-risk`).
+1. 从 PyPI 安装 `code-review-graph`。
+2. 恢复缓存的 `.code-review-graph/` SQLite 图谱（或在缓存未命中时从头构建），并增量重新解析 PR 变更的文件。
+3. 运行 `code-review-graph detect-changes --base origin/<base-branch>` 获取风险评分的函数、受影响的执行流和测试缺口。
+4. 通过 `scripts/render_pr_comment.py` 渲染 Markdown 报告，并更新一个置顶 PR 评论——每次推送时同一评论被更新，因此 PR 线程从不被刷屏。
+5. 可选：当整体风险分数超过阈值时使作业失败（`fail-on-risk`）。
 
-## Quick start (external repositories)
+## 快速开始（外部仓库）
 
 ```yaml
 # .github/workflows/code-review-graph.yml
@@ -43,10 +33,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-That is the whole setup. The default `GITHUB_TOKEN` provided by Actions is
-sufficient — no PAT, no API key, no third-party service.
+这就是全部设置。Actions 提供的默认 `GITHUB_TOKEN` 就够了——不需要 PAT、API 密钥或第三方服务。
 
-To turn the review into a merge gate:
+将审查变为合并门控：
 
 ```yaml
       - uses: tirth8205/code-review-graph@v2.3.6
@@ -55,112 +44,67 @@ To turn the review into a merge gate:
           fail-on-risk: high
 ```
 
-## Inputs
+## 输入参数
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `github-token` | yes | — | Token used to post the sticky PR comment via the GitHub API. The workflow's default `GITHUB_TOKEN` works when the job has `pull-requests: write`. |
-| `comment` | no | `true` | Post (and keep updated) the sticky PR comment. Set to `false` to run analysis/gating without commenting. |
-| `fail-on-risk` | no | `none` | Fail the job when the overall risk score reaches a level: `none` (never fail), `high` (risk ≥ 0.70), `critical` (risk ≥ 0.85). |
-| `python-version` | no | `3.12` | Python version used to run code-review-graph (3.10+ supported). |
+| 输入 | 必需 | 默认值 | 描述 |
+|------|------|--------|------|
+| `github-token` | 是 | — | 通过 GitHub API 发布置顶 PR 评论所用的 Token。作业的默认 `GITHUB_TOKEN` 在 `pull-requests: write` 权限时即可工作。 |
+| `comment` | 否 | `true` | 发布（并持续更新）置顶 PR 评论。设为 `false` 仅运行分析/门控而不评论。 |
+| `fail-on-risk` | 否 | `none` | 当整体风险分数达到某级别时使作业失败：`none`（从不失败）、`high`（风险 ≥ 0.70）、`critical`（风险 ≥ 0.85）。 |
+| `python-version` | 否 | `3.12` | 运行 code-review-graph 的 Python 版本（支持 3.10+）。 |
 
-### Risk levels
+### 风险等级
 
-`detect-changes` produces a 0.0–1.0 overall risk score (max across changed
-functions; see `code_review_graph/changes.py:compute_risk_score` for the
-scoring factors: flow participation, community crossing, test coverage,
-security-sensitive names, caller count). The action maps it to levels:
+`detect-changes` 产生一个 0.0–1.0 的整体风险分数（变更函数中的最大值；评分因素见 `code_review_graph/changes.py:compute_risk_score`：流参与度、社区交叉、测试覆盖、安全敏感名称、调用者计数）。Action 将其映射到等级：
 
-| Level | Score |
-|-------|-------|
-| low | < 0.40 |
-| medium | 0.40 – 0.69 |
-| high | 0.70 – 0.84 |
-| critical | ≥ 0.85 |
+| 等级 | 分数 |
+|------|------|
+| low（低） | < 0.40 |
+| medium（中） | 0.40 – 0.69 |
+| high（高） | 0.70 – 0.84 |
+| critical（严重） | ≥ 0.85 |
 
-## What the comment contains
+## 评论包含的内容
 
-- **Overall risk** score and level, with counts of changed functions,
-  affected flows, and test gaps.
-- **Risk-scored changes** — a table of the top changed symbols ordered by
-  risk, with file:line locations and test-coverage status.
-- **Affected execution flows** — which entry-point flows the change touches,
-  ordered by criticality.
-- **Test gaps** — changed functions with no direct test coverage.
-- **Token savings** — how many tokens the graph-backed report saved versus
-  reading every changed file in full. This is the same `context_savings`
-  estimate the CLI's Token Savings panel shows (a `chars / 4` approximation
-  labelled `estimated: true` — see [REPRODUCING.md](REPRODUCING.md) for the
-  calibration methodology).
-- A `Powered by code-review-graph` footer.
+- **整体风险**分数和等级，含变更函数、受影响流和测试缺口的计数。
+- **风险评分变更**——按风险排序的顶级变更符号表，含 file:line 位置和测试覆盖状态。
+- **受影响的执行流**——变更触及的入口点流，按关键性排序。
+- **测试缺口**——没有直接测试覆盖的变更函数。
+- **Token 节省**——图谱支撑的报告比完整读取每个变更文件节省了多少 Token。与 CLI 的 Token Savings 面板显示的 `context_savings` 估算相同（`chars / 4` 近似值，标注 `estimated: true`——见 [REPRODUCING.md](REPRODUCING.md) 了解校准方法论）。
+- `Powered by code-review-graph` 页脚。
 
-The comment starts with a hidden HTML marker
-(`<!-- code-review-graph-report -->`). The action looks the marker up via
-`gh api` on each run and PATCHes the existing comment instead of creating a
-new one (a "sticky" comment).
+评论以一个隐藏的 HTML 标记（`<!-- code-review-graph-report -->`）开头。Action 每次运行时通过 `gh api` 查找标记并 PATCH 现有评论而非创建新的（"置顶"评论）。
 
-## Cache behavior
+## 缓存行为
 
-The action caches the `.code-review-graph/` directory (the SQLite graph
-database) with `actions/cache`:
+Action 使用 `actions/cache` 缓存 `.code-review-graph/` 目录（SQLite 图谱数据库）：
 
-- **Key**: `code-review-graph-schema9-<runner.os>-<hashFiles(lockfiles)>`,
-  where the lockfile hash covers common Python/JS/Go/Rust/Ruby/PHP lockfiles
-  (`uv.lock`, `poetry.lock`, `requirements*.txt`, `package-lock.json`,
-  `go.sum`, `Cargo.lock`, …).
-- **Schema segment**: `schema9` tracks the database schema version
-  (`LATEST_VERSION` in `code_review_graph/migrations.py`). It is bumped when
-  the schema changes so stale caches are never restored across incompatible
-  versions.
-- **Restore keys**: fall back to any cache for the same OS and schema, so a
-  lockfile change still reuses the previous graph.
-- **On cache hit**: the action runs `code-review-graph update --base
-  origin/<base-branch>`, which re-parses only the files that differ from the
-  PR's base ref. If the restored database turns out to be unusable, it falls
-  back to a full `build`.
-- **On cache miss**: a full `code-review-graph build` runs (one-time cost;
-  subsequent PR runs are incremental).
+- **键**：`code-review-graph-schema9-<runner.os>-<hashFiles(lockfiles)>`，其中 lockfile 哈希覆盖常见的 Python/JS/Go/Rust/Ruby/PHP lockfile（`uv.lock`、`poetry.lock`、`requirements*.txt`、`package-lock.json`、`go.sum`、`Cargo.lock` 等）。
+- **模式段**：`schema9` 追踪数据库模式版本（`code_review_graph/migrations.py` 中的 `LATEST_VERSION`）。当模式变更时会增加，因此不会跨不兼容版本恢复过期缓存。
+- **恢复键**：回退到相同 OS 和模式的任何缓存，因此 lockfile 变更仍可复用之前的图谱。
+- **缓存命中**：Action 运行 `code-review-graph update --base origin/<base-branch>`，只重新解析与 PR 基准引用不同的文件。如果恢复的数据库不可用，则回退到完整 `build`。
+- **缓存未命中**：运行完整 `code-review-graph build`（一次性成本；后续 PR 运行为增量）。
 
-## Security notes
+## 安全说明
 
-- **Token scope**: the action needs only `pull-requests: write` (to post the
-  comment) and `contents: read` (for checkout). Grant exactly that in the
-  workflow's `permissions:` block — the examples above do. The token is used
-  for nothing except listing/creating/updating the one PR comment.
-- **Local-first**: analysis runs entirely on the runner. No code, diff, or
-  metadata leaves GitHub's infrastructure; there is no external API, account,
-  or key.
-- **Untrusted input**: all dynamic values (`github.base_ref`, the PR number,
-  action inputs) are passed to scripts through environment variables, never
-  interpolated into shell commands. The markdown renderer escapes
-  table/markup characters and strips control characters from symbol names
-  and file paths before they reach the comment body, on top of the
-  server-side `_sanitize_name()` sanitization.
-- **Pinning**: when consuming the action from another repository, pin
-  `uses:` to a release tag or commit SHA rather than `@main`.
-- **Fork PRs**: `pull_request` runs from forks receive a read-only
-  `GITHUB_TOKEN`, so the comment step will fail for fork PRs unless you use
-  `pull_request_target` — which checks out trusted base-branch workflow
-  code; understand [the security implications](https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/)
-  before switching, or set `comment: false` for fork PRs.
+- **Token 范围**：Action 只需 `pull-requests: write`（发布评论）和 `contents: read`（checkout）。在 workflow 的 `permissions:` 块中仅授予这些——上面的示例已做到。Token 仅用于列出/创建/更新那一个 PR 评论。
+- **本地优先**：分析完全在运行器上运行。没有代码、diff 或元数据离开 GitHub 基础设施；没有外部 API、账户或密钥。
+- **不可信输入**：所有动态值（`github.base_ref`、PR 编号、Action 输入）通过环境变量传递给脚本，从不插入 shell 命令。Markdown 渲染器在表/标记字符到达评论正文前进行转义，并从符号名和文件路径中剥离控制字符，此外还有服务器端 `_sanitize_name()` 的清理。
+- **版本固定**：从其他仓库使用 Action 时，将 `uses:` 固定到 release 标签或 commit SHA 而非 `@main`。
+- **Fork PR**：来自 fork 的 `pull_request` 运行会收到只读的 `GITHUB_TOKEN`，因此评论步骤对 fork PR 会失败，除非你使用 `pull_request_target`——这会检出可信的基准分支工作流代码；切换前请理解[安全影响](https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/)，或为 fork PR 设置 `comment: false`。
 
-## Dogfooding
+## 自行验证
 
-This repository runs the action on its own PRs via
-[`.github/workflows/pr-review.yml`](../.github/workflows/pr-review.yml),
-which `uses: ./` (the local `action.yml`).
+本仓库通过 [`.github/workflows/pr-review.yml`](../.github/workflows/pr-review.yml) 在自己的 PR 上运行此 Action，使用的 `uses: ./`（本地 `action.yml`）。
 
-## Rendering script
+## 渲染脚本
 
-The markdown rendering and risk gating logic lives in
-[`scripts/render_pr_comment.py`](../scripts/render_pr_comment.py) (stdlib
-only, unit-tested in `tests/test_action_render.py`) rather than inline YAML,
-so it can be tested and reused:
+Markdown 渲染和风险门控逻辑位于 [`scripts/render_pr_comment.py`](../scripts/render_pr_comment.py)（仅使用标准库，单元测试在 `tests/test_action_render.py` 中），而非内联 YAML，因此可以测试和复用：
 
 ```bash
 code-review-graph detect-changes --base origin/main | \
-  python scripts/render_pr_comment.py            # markdown to stdout
+  python scripts/render_pr_comment.py            # Markdown 到标准输出
 
 python scripts/render_pr_comment.py --input report.json \
-  --fail-on-risk high --quiet                    # gate only: exit 3 on breach
+  --fail-on-risk high --quiet                    # 仅门控：违约时退出码 3
 ```

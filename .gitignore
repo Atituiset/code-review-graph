@@ -92,3 +92,6 @@ SCALING_AND_TOKEN_EFFICIENCY_PLAN.md
 # Beads / Dolt files (added by bd init)
 .dolt/
 .beads-credential-key
+
+# mdBook build output (deployed via GitHub Actions)
+book/

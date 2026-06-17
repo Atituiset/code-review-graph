@@ -1,0 +1,12 @@
+[book]
+title = "code-review-graph 文档"
+authors = ["Tirth"]
+description = "基于本地优先知识图谱的 Token 高效代码审查工具，支持 MCP 和 CLI"
+src = "docs"
+language = "zh"
+
+[output.html]
+git-repository-url = "https://github.com/tirth8205/code-review-graph"
+default-theme = "navy"
+preferred-dark-theme = "navy"
+additional-css = []

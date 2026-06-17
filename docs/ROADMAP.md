@@ -1,114 +1,114 @@
-# Roadmap
+# 路线图
 
-## Shipped
+## 已发布
 
 ### v2.3.6
-- **Custom languages without forking**: `.code-review-graph/languages.toml` maps extensions and node types to any tree-sitter-language-pack grammar (`docs/CUSTOM_LANGUAGES.md`)
-- **GitHub Action** for risk-scored PR review comments: graph built/restored on the CI runner, sticky comment upserted per push, optional `fail-on-risk` merge gate; dogfooded via `.github/workflows/pr-review.yml` (`docs/GITHUB_ACTION.md`)
-- **`agent_baseline` benchmark**: graph queries vs a realistic grep-and-read-top-k agent baseline, wired into all six pinned eval configs
-- **Co-change ground truth** for `impact_accuracy`; the legacy graph-derived metric is labelled as a circular upper bound
-- **Weekly eval CI**: report-only cron run of the two smallest configs (`.github/workflows/eval.yml`)
-- **`docs/FAQ.md`**: comparisons with LSP, RAG, grep/agentic search, and adjacent tools, plus when-not-to-use guidance
-- **Contribution scaffolding**: issue forms, PR template, dependabot config
-- **Windows fixes** for `daemon status` (#511) and `detect-changes` path mapping (#528)
-- **Reliability**: embedding provider-name validation, SQLite store-leak fixes in analysis/wiki tools, `fastmcp<4` cap, hooks installed via `git rev-parse --git-path hooks`
+- **无需 fork 即可自定义语言**：`.code-review-graph/languages.toml` 将扩展名和节点类型映射到任意 tree-sitter-language-pack 语法（`docs/CUSTOM_LANGUAGES.md`）
+- **GitHub Action** 用于风险评分 PR 审查评论：在 CI 运行器上构建/恢复图谱，每次推送更新置顶评论，可选 `fail-on-risk` 合并门控；通过 `.github/workflows/pr-review.yml` 自行验证（`docs/GITHUB_ACTION.md`）
+- **`agent_baseline` 基准**：图谱查询与现实的 grep-and-read-top-k 代理基线对比，已接入所有六个固定评估配置
+- `impact_accuracy` 的**协同变更真值**；旧图谱推导指标标注为循环上限
+- **每周评估 CI**：两个最小配置的仅报告定时运行（`.github/workflows/eval.yml`）
+- **`docs/FAQ.md`**：与 LSP、RAG、grep/代理搜索和相邻工具的对比，以及何时不用指南
+- **贡献脚手架**：issue 表单、PR 模板、dependabot 配置
+- **Windows 修复**：`daemon status`（#511）和 `detect-changes` 路径映射（#528）
+- **可靠性**：嵌入提供者名称验证、分析/wiki 工具中的 SQLite 存储泄漏修复、`fastmcp<4` 上限、通过 `git rev-parse --git-path hooks` 安装钩子
 
 ### v2.3.5
-- **Token Savings panel** on `detect-changes --brief` and the new `update --brief` — boxed CLI output with per-category breakdown that sums exactly to the graph response size
-- **`--verify` flag** cross-checks the displayed savings against OpenAI's `cl100k_base` tokenizer; calibration data committed in `docs/REPRODUCING.md` shows the estimate is within ~1% of real GPT-4 tokens in aggregate
-- **`code-review-graph embed`** CLI subcommand for explicit embedding generation
-- **Deterministic eval pipeline**: pinned upstream SHAs in every config, full clones with `returncode` checks, fixed-seed Leiden community detection (`CRG_LEIDEN_SEED`)
-- **`multi_hop_retrieval` benchmark**: 11 curated 2-step tool-chain tasks; average score 0.909
-- **Richer embedding text** and **identifier-aware search boost** lift multi-hop accuracy from 0.545 to 0.909
-- **Path normalization fix** in the eval pipeline + test-gap dedup in the brief summary
-- **`docs/REPRODUCING.md`**: end-to-end recipe with canonical numbers and tiktoken calibration table
-- Demo GIF (`diagrams/context-savings-demo.gif`) showing both CLI surfaces and `--verify`
+- `detect-changes --brief` 和新 `update --brief` 上的 **Token Savings 面板** —— 带框 CLI 输出，按类别细目总和精确等于图谱响应大小
+- **`--verify` 标志** 与 OpenAI 的 `cl100k_base` 分词器交叉核对显示的节省；`docs/REPRODUCING.md` 中提交的校准数据显示预估与真实 GPT-4 Token 总量偏差约 ~1%
+- **`code-review-graph embed`** CLI 子命令用于显式嵌入生成
+- **确定性评估管道**：每个配置固定上游 SHA，完整克隆加 `returncode` 检查，固定种子的 Leiden 社区检测（`CRG_LEIDEN_SEED`）
+- **`multi_hop_retrieval` 基准**：11 个策划的 2 步工具链任务；平均得分 0.909
+- **更丰富嵌入文本** 和**标识符感知搜索增强** 将多跳准确度从 0.545 提升到 0.909
+- 评估管道中的**路径规范化修复** + 简要摘要中的测试缺口去重
+- **`docs/REPRODUCING.md`**：端到端配方，含标准数字和 tiktoken 校准表
+- 演示 GIF（`diagrams/context-savings-demo.gif`）展示两个 CLI 界面和 `--verify`
 
 ### v2.3.4
-- 30 MCP tools and 5 MCP prompts
-- Estimated context savings metadata for review, impact, detect-changes, and compact architecture responses
-- Compact architecture overview by default to reduce large MCP payloads
-- Bounded change-analysis controls for large diffs (`CRG_MAX_CHANGED_FUNCS`, `CRG_MAX_TRANSITIVE_FRONTIER`, `CRG_TOOL_TIMEOUT`)
-- Windows FastMCP semantic-search deadlock mitigation
-- Rust test detection and path lookup correctness fixes
-- Documentation and release metadata refreshed for the 2.3.4 release
+- 30 个 MCP 工具和 5 个 MCP 提示词
+- 审查、影响、检测变更和精简架构响应的预估 Token 节省元数据
+- 默认精简架构概览以减少大型 MCP 负载
+- 大型 diff 的有界变更分析控制（`CRG_MAX_CHANGED_FUNCS`、`CRG_MAX_TRANSITIVE_FRONTIER`、`CRG_TOOL_TIMEOUT`）
+- Windows FastMCP 语义搜索死锁缓解
+- Rust 测试检测和路径查找正确性修复
+- 2.3.4 版本的文档和版本元数据刷新
 
 ### v2.3.3
-- Broad parser surface expansion across source languages, shell scripts, notebooks, and SFC-style files
-- Additional AI coding platform install targets including Gemini CLI, Qwen, Kiro, Qoder, and GitHub Copilot variants
-- Streamable HTTP MCP transport on localhost
-- Parser/resolver, Windows, FastMCP, and daemon reliability fixes
-- Community PR sweep and VS Code accessibility improvements
+- 跨源语言、Shell 脚本、笔记本和 SFC 风格文件的广泛解析器扩展
+- 额外的 AI 编码平台安装目标，包括 Gemini CLI、Qwen、Kiro、Qoder 和 GitHub Copilot 变体
+- 流式 HTTP MCP 传输在 localhost
+- 解析器/解析器、Windows、FastMCP 和守护进程可靠性修复
+- 社区 PR 清理和 VS Code 可访问性改进
 
 ### v2.2.0
-- Multi-repo watch daemon (`crg-daemon` / `code-review-graph daemon`)
-- TOML-based daemon configuration (`~/.code-review-graph/watch.toml`)
-- Child process management: one `code-review-graph watch` process per repo
-- Config file watching with automatic reconciliation of watcher processes
-- Daemonization with PID file management
-- Health checking with automatic restart of dead watchers
-- Standalone `crg-daemon` CLI entry point (7 subcommands)
-- Integrated `daemon` subcommand group in main CLI
+- 多仓库监视守护进程（`crg-daemon` / `code-review-graph daemon`）
+- 基于 TOML 的守护进程配置（`~/.code-review-graph/watch.toml`）
+- 子进程管理：每个仓库一个 `code-review-graph watch` 进程
+- 配置文件监视，自动协调监视进程
+- 带有 PID 文件管理的守护进程化
+- 健康检查，自动重启死掉的监视器
+- 独立 `crg-daemon` CLI 入口点（7 个子命令）
+- 主 CLI 中集成的 `daemon` 子命令组
 
 ### v2.0.0
-- 22 MCP tools (up from 9) and 5 MCP prompts
-- 18 languages (added Dart, R, Perl)
-- Execution flow detection with criticality scoring
-- Community detection (Leiden algorithm via igraph, file-based fallback)
-- Architecture overview with coupling warnings
-- Risk-scored change detection (`detect_changes`)
-- Refactoring tools (rename preview, dead code, suggestions)
-- Wiki generation from community structure
-- Multi-repo registry with cross-repo search
-- FTS5 full-text search with porter stemming
-- Database migrations (v1-v5)
-- Evaluation framework with matplotlib visualization
-- TypeScript tsconfig path alias resolution
-- MiniMax embedding provider (embo-01)
-- Optional dependency groups: `[embeddings]`, `[google-embeddings]`, `[communities]`, `[eval]`, `[wiki]`, `[all]`
-- 486 tests across 22 test files
+- 22 个 MCP 工具（从 9 个增加）和 5 个 MCP 提示词
+- 18 种语言（新增 Dart、R、Perl）
+- 带关键性评分的执行流检测
+- 社区检测（通过 igraph 的 Leiden 算法，基于文件回退）
+- 带耦合警告的架构概览
+- 风险评分变更检测（`detect_changes`）
+- 重构工具（重命名预览、死代码、建议）
+- 从社区结构生成 Wiki
+- 带跨仓库搜索的多仓库注册表
+- 带 Porter 词干提取的 FTS5 全文搜索
+- 数据库迁移（v1-v5）
+- 带 matplotlib 可视化的评估框架
+- TypeScript tsconfig 路径别名解析
+- MiniMax 嵌入提供者（embo-01）
+- 可选依赖组：`[embeddings]`、`[google-embeddings]`、`[communities]`、`[eval]`、`[wiki]`、`[all]`
+- 22 个测试文件中的 486 个测试
 
 ### v1.8.4
-- Multi-word AND search, call target resolution, impact radius pagination
-- `find_large_functions_tool`, Vue SFC and Solidity support
-- Documentation overhaul
+- 多词 AND 搜索、调用目标解析、影响半径分页
+- `find_large_functions_tool`、Vue SFC 和 Solidity 支持
+- 文档刷新
 
 ### v1.7.0
-- `install` command as primary entry point (`init` kept as alias)
-- `--dry-run` flag for previewing install/init changes
-- Automatic PyPI publishing via GitHub Actions on release
-- README rewrite with real benchmark data from httpx, FastAPI, and Next.js
+- `install` 命令作为主入口（`init` 保留为别名）
+- 用于预览安装/初始化变更的 `--dry-run` 标志
+- 通过 GitHub Actions 在发布时自动 PyPI 发布
+- 使用来自 httpx、FastAPI 和 Next.js 的真实基准数据重写 README
 
 ### v1.6.x
-- Portable `uvx`-based MCP config
-- SessionStart hook for automatic graph tool preference
-- 24 audit fixes: C/C++ support, performance, CI hardening
+- 可移植的 `uvx` 核心 MCP 配置
+- 自动图谱工具偏好的 SessionStart 钩子
+- 24 个审计修复：C/C++ 支持、性能、CI 加固
 
 ### v1.5.x
-- Generated files in `.code-review-graph/` directory
-- Visualization density: collapsed start, search, edge toggles
-- Works without git
+- `.code-review-graph/` 目录中的生成文件
+- 可视化密度：折叠启动、搜索、边切换
+- 无需 git 即可工作
 
 ### v1.4.0
-- `init` command, interactive D3.js visualization, `serve` command
+- `init` 命令、交互式 D3.js 可视化、`serve` 命令
 
 ### v1.3.0
-- Universal pip install, CLI entry point, Python version check
+- 通用 pip 安装、CLI 入口点、Python 版本检查
 
 ### v1.1.0-v1.2.0
-- Watch mode, vector embeddings, logging, CI coverage
+- Watch 模式、向量嵌入、日志、CI 覆盖
 
-### v1.0.0 (Foundation)
-- Persistent SQLite knowledge graph, Tree-sitter parsing, incremental updates
-- Impact radius analysis, 6 MCP tools, 3 skills
+### v1.0.0（基础版本）
+- 持久化 SQLite 知识图谱、Tree-sitter 解析、增量更新
+- 影响半径分析、6 个 MCP 工具、3 个技能
 
-## Planned
+## 计划中
 
-- GitHub App / bot mode beyond the shipped GitHub Action (org-wide install, check runs)
-- Team sync (shared graph via git-tracked DB)
-- Performance optimization for monorepos (>50k files)
+- GitHub App / bot 模式，超越当前 GitHub Action（组织级安装、check run）
+- 团队同步（通过 git 跟踪 DB 共享图谱）
+- Monorepo 性能优化（>50k 文件）
 
-## Ongoing
+## 进行中
 
-- Additional language grammars as requested
-- Integration updates as AI coding platforms evolve
+- 按需添加额外语言语法
+- 随 AI 编码平台演进的集成更新
