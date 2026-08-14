@@ -1,0 +1,13 @@
+[book]
+title = "code-review-graph 深入解析"
+description = "从原理架构到与 clangd / CSA 的对比——初学者与进阶者双视角学习文档"
+src = "learn"
+language = "zh-CN"
+
+[output.html]
+default-theme = "ayu"
+git-repository-url = "https://github.com/Atituiset/code-review-graph"
+edit-url-template = "https://github.com/Atituiset/code-review-graph/edit/main/learn/{path}"
+
+[output.html.search]
+limit-results = 20
