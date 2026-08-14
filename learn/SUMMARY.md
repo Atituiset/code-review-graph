@@ -20,4 +20,5 @@
 # 对比篇
 
 - [与 clangd / CSA 的本质区别](./compare/vs-clangd-csa.md)
+- [与 mcp-language-server 的对比（LSP 代理路线）](./compare/vs-mcp-language-server.md)
 - [优点、不足与适用场景](./compare/pros-cons.md)
