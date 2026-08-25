@@ -9,12 +9,12 @@ code-review-graph 的整体架构可以压缩成一句话：**一条单向的数
       │
       ▼
 ┌─────────────┐   git ls-files + ignore 规则
-│ 1. 发现      │   collect_all_files  (incremental.py:859)
+│ 1. 发现      │   collect_all_files  (incremental.py:1027)
 └─────────────┘
       │  文件清单 + 字节内容
       ▼
 ┌─────────────┐   tree-sitter 进程池并行
-│ 2. 解析      │   CodeParser.parse_bytes  (parser.py:2598)
+│ 2. 解析      │   CodeParser.parse_bytes  (parser.py:2600)
 └─────────────┘
       │  NodeInfo / EdgeInfo（含未解析裸名）
       ▼
@@ -35,22 +35,22 @@ code-review-graph 的整体架构可以压缩成一句话：**一条单向的数
 
 ## 阶段 1：发现
 
-`collect_all_files`（`code_review_graph/incremental.py:859`）枚举仓库内所有可解析文件。首选路径是 `git ls-files`，它天然跳过 `.gitignore` 覆盖的内容和未跟踪文件；函数还接受 `recurse_submodules` 参数控制是否进入子模块。非 git 场景（或其本身失败时）退化为文件系统遍历，再套用项目自己的 ignore 规则。
+`collect_all_files`（`code_review_graph/incremental.py:1027`）枚举仓库内所有可解析文件。首选路径是 `git ls-files`，它天然跳过 `.gitignore` 覆盖的内容和未跟踪文件；函数还接受 `recurse_submodules` 参数控制是否进入子模块。非 git 场景（或其本身失败时）退化为文件系统遍历，再套用项目自己的 ignore 规则。
 
 发现阶段只产出路径清单，不读内容——读内容推迟到解析阶段，配合 SHA-256 哈希短路（见下一章），让"哪些文件需要解析"的判定尽量廉价。
 
 ## 阶段 2：解析
 
-`CodeParser.parse_bytes`（`code_review_graph/parser.py:2598`）接收预先读好的字节而不是路径。签名里的这个选择是一个刻意的 TOCTOU 防护：哈希计算、shebang 语言探测、tree-sitter 解析全部作用于**同一份字节**，入库的 `file_hash` 永远描述实际被解析的内容——不会出现"哈希的是 A 版本、解析的是 B 版本"的竞态。
+`CodeParser.parse_bytes`（`code_review_graph/parser.py:2600`）接收预先读好的字节而不是路径。签名里的这个选择是一个刻意的 TOCTOU 防护：哈希计算、shebang 语言探测、tree-sitter 解析全部作用于**同一份字节**，入库的 `file_hash` 永远描述实际被解析的内容——不会出现"哈希的是 A 版本、解析的是 B 版本"的竞态。
 
 产物是两个纯数据列表：
 
-- `NodeInfo`（parser.py:668）：kind/name/file_path/line 区间/params/return_type/is_test/extra 等；
-- `EdgeInfo`（parser.py:692）：kind（CALLS/IMPORTS_FROM/INHERITS/IMPLEMENTS/CONTAINS……）加 source/target 字符串名。
+- `NodeInfo`（parser.py:670）：kind/name/file_path/line 区间/params/return_type/is_test/extra 等；
+- `EdgeInfo`（parser.py:694）：kind（CALLS/IMPORTS_FROM/INHERITS/IMPLEMENTS/CONTAINS……）加 source/target 字符串名。
 
-并行化发生在调用侧：`incremental.py:67` 的 `_make_executor` 默认使用 `ProcessPoolExecutor`——worker 不能继承父进程的 SQLite 连接或 MCP transport，所以必须是进程而非线程；个别平台受限时退化到 `ThreadPoolExecutor`。每个 worker 只返回上述纯数据，不带任何 SQLite 句柄，因此解析阶段完全无锁、无事务、无共享状态。
+并行化发生在调用侧：`_make_executor`（incremental.py:70）按 `_select_executor_kind`（incremental.py:43）的选择工作，默认 `ProcessPoolExecutor`——worker 不能继承父进程的 SQLite 连接或 MCP transport，所以必须是进程而非线程；MCP stdio 服务活跃或 Windows 非 TTY 时退化为 `ThreadPoolExecutor`，避免 fork 破坏 stdio 流。worker 数上限是 `min(CPU 核数, 8)`。每个 worker 只返回上述纯数据，不带任何 SQLite 句柄，因此解析阶段完全无锁、无事务、无共享状态。
 
-**关键设计：解析阶段故意不做全局名称解析。** 跨文件引用以裸字符串名（如 `handle`、`UserService::save`）原样写入边，证据（receiver、import 来源等）塞进边的 `extra` JSON。全局解析推迟到阶段 4 和 Resolver 层（见第 3 章）。这个"延迟解析"决定是进程池能成立的前提——单文件解析若需要全图上下文，并行 worker 之间就需要共享数据库，整套简洁性立刻崩塌。
+**关键设计：解析阶段故意不做全局名称解析。** 跨文件引用以裸字符串名（如 `handle`、`UserService::save`）原样写入边，证据（receiver、import 来源等）塞进边的 `extra` JSON。全局解析推迟到阶段 4 和 Resolver 层（见第 4 章）。这个"延迟解析"决定是进程池能成立的前提——单文件解析若需要全图上下文，并行 worker 之间就需要共享数据库，整套简洁性立刻崩塌。
 
 ## 阶段 3：入库
 
@@ -81,13 +81,15 @@ code-review-graph 的整体架构可以压缩成一句话：**一条单向的数
 
 另有一个默认关闭的第六步：显式传入 provider 和 model 时刷新 embeddings（`_refresh_embeddings`，postprocessing.py:175）。默认关闭的理由写在 docstring 里：云端 provider 会把源码派生文本传出本机并产生 API 成本。
 
+后处理还有**档位**：MCP 的 build 工具（`tools/build.py`）在上述步骤之外补建 v6 三张摘要表，并按 `postprocess` 参数分档——`full`（默认，全部）、`minimal`（签名+FTS 为止，跳过 flow 与社区）、`none`；CLI 的 `--skip-flows` / `--skip-postprocess` 是同一开关的人面。每档都记录各阶段的耗时（`postprocess_timing`），让"构建慢"可以定位到具体步骤。降档的用途很直接：agent 在会话中触发增量更新时不需要每次都重算社区。
+
 ## 三入口共享同一管线
 
 CLI（`build`/`update`/`watch` 命令）、MCP 工具、watch 模式，走的是**同一条** `run_post_processing`——这正是该函数被抽成独立模块的原因（其 docstring，postprocessing.py:16-17："every entry point … produces identical results"）。三个入口的差异只在触发方式：
 
 - **CLI**：一次性命令，由人或 CI 触发，适合初始构建与定时重建；
 - **MCP**：AI 助手在会话中调用工具，触发增量更新或纯查询；
-- **watch**：watchdog 文件系统事件驱动，1 秒防抖批处理后跑增量更新（`_DEBOUNCE_SECONDS = 1`，incremental.py:1362）。
+- **watch**：watchdog 文件系统事件驱动，1 秒防抖批处理后跑增量更新（`_DEBOUNCE_SECONDS = 1`，incremental.py:1568）。
 
 共享管线消除了"不同入口建出不同的图"这一整类 bug——任何入口修复的解析问题，所有入口同时受益。
 
@@ -96,8 +98,8 @@ CLI（`build`/`update`/`watch` 命令）、MCP 工具、watch 模式，走的是
 `WatchDaemon`（`code_review_graph/daemon.py:644`）常被误认为是中心服务，这是误解。它只做一件事：**为每个被监听的仓库 fork 一个 `code-review-graph watch` 子进程并看管它们**。架构约束非常克制：
 
 - 每仓库一个独立子进程，进程间**没有 IPC**；
-- 状态全部落在 `daemon-state.json`（路径由 `daemon.py:55` 给出）：PID、仓库路径、启动时间；
-- 存活探测用 `os.kill(pid, 0)`（daemon.py:479），优雅退出靠 SIGTERM/SIGHUP 处理器（`_setup_signal_handlers`，daemon.py:983）；
+- 状态全部落在 `daemon-state.json`（路径由 `daemon.py:56` 给出）：PID、仓库路径、启动时间；
+- 存活探测用 `os.kill(pid, 0)`（daemon.py:487），优雅退出靠 SIGTERM/SIGHUP 处理器（`_setup_signal_handlers`，daemon.py:1154）；
 - 不依赖任何外部进程管理器（tmux/screen/systemd 都不用，见其 docstring）。
 
 daemon 自身崩溃或重启不损失任何东西——状态文件加 PID 探测足以重建对子进程的完整视图。它是"看护进程列表的脚本"，不是"必须在线的服务"。
@@ -123,21 +125,21 @@ daemon 自身崩溃或重启不损失任何东西——状态文件加 PID 探�
 | 关注点 | 文件 | 入口 |
 |---|---|---|
 | 管线编排 | `code_review_graph/postprocessing.py` | `run_post_processing` (:31) |
-| 文件发现 | `code_review_graph/incremental.py` | `collect_all_files` (:859) |
-| 解析核心 | `code_review_graph/parser.py` | `CodeParser.parse_bytes` (:2598) |
+| 文件发现 | `code_review_graph/incremental.py` | `collect_all_files` (:1027) |
+| 解析核心 | `code_review_graph/parser.py` | `CodeParser.parse_bytes` (:2600) |
 | 存储核心 | `code_review_graph/graph.py` | `store_file_nodes_edges` (:359) |
-| 增量/监听 | `code_review_graph/incremental.py` | `resolve_incremental_base` (:644) 等 |
-| 多仓库看护 | `code_review_graph/daemon.py` | `WatchDaemon` (:644) |
+| 增量/监听 | `code_review_graph/incremental.py` | `resolve_incremental_base` (:812) 等 |
+| 多仓库看护 | `code_review_graph/daemon.py` | `WatchDaemon` (:743) |
 
 ## 失败模式速查
 
 理解一个系统的边界，最快的方法是看它在各处如何失败：
 
-- **坏 grammar**：子进程探活失败 → 该语言跳过，构建继续（parser.py:473）；
+- **坏 grammar**：子进程探活失败 → 该语言跳过，构建继续（parser.py:475）；
 - **解析中文件被改写**：不可能读到混合内容——哈希与解析作用于同一份字节（parse_bytes）；
 - **写入中途崩溃**：事务回滚，该文件保持旧版本完整数据（BEGIN IMMEDIATE + 单文件事务）；
 - **某个后处理步骤失败**：记 warning，其余步骤照常（postprocessing.py 各 `_step` 的 try/except）；
-- **watch 子进程死亡**：daemon 通过 PID 探测发现，按 daemon-state.json 重建；
+- **watch 子进程死亡**：daemon 通过 PID 探测发现，按指数退避重启（30s 起步、900s 封顶）；observer 卡死但不退出则不重启，只把状态标成 stalled 留给人判断——详见第 8 章；
 - **MCP 查询时图正在被重写**：WAL 快照读，查询看到的是写入开始前的一致性版本。
 
 没有任何一种失败需要人工介入修复数据——最坏的恢复路径是删掉数据库重新全量构建，而全量构建只是这条管线的慢速重放。
@@ -146,8 +148,9 @@ daemon 自身崩溃或重启不损失任何东西——状态文件加 PID 探�
 
 管线各阶段的旋钮集中以 `CRG_*` 环境变量暴露，没有独立的配置文件体系：
 
-- `CRG_DEPENDENT_HOPS`：依赖扇出跳数（默认 2，incremental.py:944）；
-- `CRG_MAX_IMPACT_NODES` / `CRG_IMPACT_DEPTH_DECAY` / `CRG_IMPACT_SCORE_FLOOR`：影响半径的上限、衰减、地板（constants.py:43/96/98）；
+- `CRG_DEPENDENT_HOPS`：依赖扇出跳数（默认 2，incremental.py:1136）；
+- `CRG_MAX_IMPACT_NODES` / `CRG_IMPACT_DEPTH_DECAY` / `CRG_IMPACT_SCORE_FLOOR`：影响半径的上限、衰减、地板（constants.py:43/94/97）；
+- `CRG_MAX_WATCH_SCHEDULES` / `CRG_WATCH_PLAN_DEPTH`：watch 槽位预算与规划深度（incremental.py:1601-1602）；
 - `CRG_LEIDEN_SEED`：社区检测随机种子（默认 42，communities.py:21）；
 - `CRG_MAX_CHANGED_FUNCS`：变更函数截断（默认 500，changes.py:441）。
 

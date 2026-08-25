@@ -21,7 +21,7 @@ tree-sitter 是单文件、无类型的：它知道这一行有个 `foo.bar()` �
 
 ### tsconfig_resolver：唯一在解析期使用的
 
-`tsconfig_resolver.py` 是例外中的例外：它在**解析期**被 parser 直接调用（parser.py:13588-13589），把 TS/JS 的非相对 import（如 `@/utils/foo`）按 `tsconfig.json`/`jsconfig.json` 的 `compilerOptions.paths` 别名表解析成真实文件路径，让 `IMPORTS_FROM` 边直接指向文件而非别名字符串。
+`tsconfig_resolver.py` 是例外中的例外：它在**解析期**被 parser 直接调用（parser 实例化于 parser.py:2436，咨询点在 parser.py:13688），把 TS/JS 的非相对 import（如 `@/utils/foo`）按 `tsconfig.json` 的 `compilerOptions.paths` 别名表解析成真实文件路径，让 `IMPORTS_FROM` 边直接指向文件而非别名字符串。候选配置按就近目录优先（`_TSCONFIG_NAMES = ["tsconfig.json", "tsconfig.app.json", "jsconfig.json"]`，tsconfig_resolver.py:31）——v2.3.8 加入 jsconfig 兜底（#776）后，没有 tsconfig 的纯 JS Vue/Nuxt/Vite 项目不再丢掉大半导入图。实现里还有个手写的 JSONC 剥离器（去注释/尾逗号但尊重字符串字面量）和带环检测的 extends 递归链。
 
 它能进解析期是因为别名表是纯静态配置，不需要全图信息——这正好划出了两阶段的分界线：**只依赖配置/局部知识的在解析期做，依赖全图的留到构建后**。
 
@@ -33,7 +33,9 @@ tree-sitter 是单文件、无类型的：它知道这一行有个 `foo.bar()` �
 
 ### scoped_resolver：PHP/Rust/C# 的 `Class::method`
 
-PHP 的 `Foo::bar()`、Rust 的 `Type::assoc_fn()`、C# 的静态调用共享同一个模式：目标带作用域限定符但仍是裸名。`scoped_resolver.py` 构建后按 Class 名 + 方法名反查全图，重写为目标方法的 qualified name。
+PHP 的 `Foo::bar()`、Rust 的 `Type::assoc_fn()`、C# 的静态调用共享同一个模式：目标带作用域限定符但仍是裸名。`scoped_resolver.py` 构建后按 Class 名 + 方法名反查全图，重写为目标方法的 qualified name。消解的细节值得一看：PHP 标识符大小写不敏感所以匹配前 fold、Rust 则严格区分；导入后缀匹配要求"完整段"对齐，防止 `App\Warehouse\Queue\Mailer` 被错拼到 `src/Order/Queue/Mailer.php` 这种形近实远的假匹配。
+
+v2.3.8 补上了 C# receiver 调用这条线（#612）：解析期对大写开头的 receiver **无条件**保留证据（哪怕类在文件里不可见——因为 C# 的 `using` 导入的是命名空间不是文件），把"constructed/declared class"存进边的 `extra.receiver_scope`；构建后 `csharp_disambiguate`（scoped_resolver.py:331）用三级证据消歧：同文件优先 → 经 using 导入可见的唯一命名空间 → 放弃。`Service.StaticCall()`、`obj?.Method()` 这类调用从此能落到规范方法节点，C# 代码库的 `callers_of` 不再返回一排裸名。
 
 被改写的边标记 **`confidence_tier = 'INFERRED'`**（scoped_resolver.py:480-489）——因为 `Class::method` 的重名消解没有类型系统背书，是启发式推断，必须与 tree-sitter 直接抽出的 `EXTRACTED` 边区分开，供下游按可信度过滤。
 
@@ -58,7 +60,7 @@ Temporal workflow 的场景同构于 Spring：activity 调用打在 stub 代理�
 
 Spring 的事件机制（`ApplicationEventPublisher.publish(...)` → `@EventListener`）连"注入"这条线索都没有：发布者和订阅者在源码层面完全解耦，唯一的联系是事件类型。
 
-`event_resolver.py` 的做法是**合成虚拟 CALLS 边**：收集 `PUBLISHES`/`LISTENS_TO` 两类证据边，按事件类型和包匹配，把 publisher 与 listener 直接连起来，并维护合成的 Event 节点。虚拟边是派生态，每次以 rebuild 语义整体重建（event_resolver.py:45-49），防止 listener 删除/改名留下幽灵 CALLS 边——这正是第 2 章删除对账要触发它的原因。
+`event_resolver.py` 的做法是**合成虚拟 CALLS 边**：收集 `PUBLISHES`/`HANDLES` 两类证据边，按事件类型分组匹配，把 publisher 与 listener 直接连起来，并维护合成的 Event 节点。虚拟边是派生态，每次以 rebuild 语义整体重建（`resolve_spring_events`，event_resolver.py:44；先删后建），防止 listener 删除/改名留下幽灵 CALLS 边——这正是第 2 章删除对账要触发它的原因。
 
 ### rescript_resolver 与 hcl_resolver
 
@@ -68,22 +70,23 @@ Spring 的事件机制（`ApplicationEventPublisher.publish(...)` → `@EventLis
 
 向量嵌入是与 Resolver 平行的另一层"语义补全"，定位不同：Resolver 修的是**结构性**裸边（确定性的谁调用谁），embeddings 提供的是**相似性**检索（模糊的"找类似代码"）。
 
-- **5 个 provider**：local（sentence-transformers，默认、离线）、Gemini、MiniMax、OpenAI 兼容端点、Voyage（`embeddings.py` 中各 provider 类，约 275/359/630 行附近）；
+- **5 个 provider**：local（sentence-transformers，默认、离线）、Gemini、MiniMax、OpenAI 兼容端点、Voyage（各 provider 类在 `embeddings.py`）。Voyage 是 v2.3.8 新增的（#783）：文档与查询用不同的 `input_type`，并支持请求节流（`CRG_VOYAGE_MIN_INTERVAL_SEC` 控制最小间隔）；
 - **向量存同一个 SQLite**（`embeddings` 表），查询用纯 Python 暴力余弦扫描（`_cosine_similarity`，embeddings.py:1060）——没有引入任何向量索引库。本地仓库的节点量级下，全表扫描是可接受的简单选择；
-- **无向量时回退 FTS5/BM25** 关键词检索（`embeddings.py:1409` 的 hybrid search 入口，`search.py` 实现），语义搜索退化为关键词搜索而不是报错；
-- **默认关闭**：云端 provider 会把源码派生文本传出本机并产生 API 成本，启用前有显式的 stderr 警告（`_warn_cloud_egress`，embeddings.py:843）。这与项目 local-first 定位一致：语义增强是可选项，离线是默认态。
+- **批量持久化**（#783 的另一半）：嵌入按批（默认 64 个节点）写入并**每批提交一次**——云端跑一半被中断时已完成的批次保留，重跑时按 `(text_hash, provider)` 双键跳过已最新节点，不为同一批文本付两次 API 钱。换 provider 或模型会改变文本身份，自动触发重嵌；
+- **无向量时回退 FTS5/BM25** 关键词检索（hybrid search 入口在 `search.py`），语义搜索退化为关键词搜索而不是报错；
+- **默认关闭**：云端 provider 会把源码派生文本传出本机并产生 API 成本，启用前有显式的 stderr 警告（`_warn_cloud_egress`，embeddings.py:843；仅 localhost 端点或显式 `CRG_ACCEPT_CLOUD_EMBEDDINGS=1` 时跳过）。这与项目 local-first 定位一致：语义增强是可选项，离线是默认态。
 
 provider 一览：
 
 | provider | 类型 | 备注 |
 |---|---|---|
 | local | sentence-transformers | 默认，完全离线；未装依赖时为空操作 |
-| Gemini | 云端 | `gemini-embedding-001` |
+| Gemini | 云端 | `gemini-embedding-001`，指数退避重试 |
 | MiniMax | 云端 | embo-01，1536 维 |
 | OpenAI 兼容 | 云端/自建 | base_url 归一化后作为 provider 身份键 |
-| Voyage | 云端 | — |
+| Voyage | 云端 | 文档/查询分 input_type，可配请求节流 |
 
-更换 provider 或模型会改变 `provider.name`，触发自动重嵌（embeddings.py:375 附近）——向量按"谁产生的"分区，不同模型的向量不会混在同一检索空间里被误比较。
+向量按"谁产生的"分区，不同模型的向量不会混在同一检索空间里被误比较。更硬的保证在 `refresh_embeddings`（embeddings.py:1321）：刷新前校验现有行的 provider 身份集合与本次解析出的身份**完全相等**，不等就拒绝执行并报出两侧差异——刷新永远不会把索引静默迁移到另一个模型上。未知 provider 名直接 ValueError，而不是悄悄回落到 local。
 
 ## 诚实清单：存在但未接线的代码
 
@@ -121,7 +124,7 @@ provider 一览：
 
 ## 附：增量触发逻辑的实际形状
 
-条件触发的代码（`incremental.py:1313-1337`，简化）长这样：
+条件触发的代码（`incremental.py:1514-1543`，简化）长这样：
 
 ```python
 python_changed = any(p.endswith(".py")

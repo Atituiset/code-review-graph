@@ -153,7 +153,7 @@ code-review-graph uninstall --dry-run           # 卸载前先看会清理什么
 
 ## 9. 常见问题
 
-**图数据会被提交进 git 吗？** 不会。建图时会自动把 `.code-review-graph/` 追加到仓库的 `.gitignore`（见 `code_review_graph/incremental.py:408-425`）。
+**图数据会被提交进 git 吗？** 不会。建图时会自动把 `.code-review-graph/` 追加到仓库的 `.gitignore`（见 `code_review_graph/incremental.py:446` 起）。
 
 **想排除某些文件不进图？** 在仓库根目录建一个 `.code-review-graphignore` 文件，写法与 `.gitignore` 相同（`code_review_graph/incremental.py:435`）。
 

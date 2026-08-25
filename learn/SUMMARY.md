@@ -13,9 +13,12 @@
 
 - [架构总览：四阶段管线](./advanced/architecture.md)
 - [解析与存储：tree-sitter、SQLite 图模型、增量更新](./advanced/pipeline.md)
+- [语言与框架语义层：从语法抽取到框架约定](./advanced/language-semantics.md)
 - [语义解析层：Resolver 机制](./advanced/resolvers.md)
 - [查询引擎：影响半径、流、社区与风险评分](./advanced/query-engine.md)
+- [可信度报告：空结果为什么不等于"不存在"](./advanced/uncertainty.md)
 - [Token 经济：为 LLM 设计的上下文预算](./advanced/token-economy.md)
+- [守护进程与 watch：长时运行的可靠性工程](./advanced/daemon-watch.md)
 
 # 对比篇
 

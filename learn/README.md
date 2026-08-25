@@ -1,6 +1,6 @@
 # code-review-graph 深入解析
 
-这是一份关于开源项目 [code-review-graph](https://github.com/tirth8205/code-review-graph) 的学习文档，基于 v2.3.7 源码逐行分析写成，回答三个问题：
+这是一份关于开源项目 [code-review-graph](https://github.com/tirth8205/code-review-graph) 的学习文档，基于 v2.3.8 源码逐行分析写成（v2.3.7 初版 + v2.3.8 全量复核），回答三个问题：
 
 1. **它是什么** —— 一个本地优先的代码知识图谱工具：用 tree-sitter 把仓库解析成"符号 + 关系"图，存进 SQLite，再通过 MCP / CLI 给 AI 编码助手（Claude Code、Cursor 等）提供**按 token 预算裁剪过的**代码审查上下文。
 2. **它怎么工作** —— 从解析、存储、增量更新，到影响半径计算、风险评分、社区检测的完整管线。
