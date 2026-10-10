@@ -100,5 +100,6 @@ OC3_TECHNICAL_CONTRIBUTION.md
 OC3_TECHNICAL_CONTRIBUTION.pdf
 PRESENTATION_BRIEF.md
 
-# mdBook build output (deployed via .github/workflows/pages.yml)
-book/
+# VitePress build output (deployed via .github/workflows/pages.yml)
+docs-vitepress/.vitepress/dist
+docs-vitepress/.vitepress/cache

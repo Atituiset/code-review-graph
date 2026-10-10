@@ -26,12 +26,12 @@ agent 问 `query_graph(pattern="callers_of", target="UserService.save")`，得�
 | 级 | 情形 | 输出要点 |
 |---|---|---|
 | 1 | 图为空 | "nothing is indexed, so this 0 says nothing about the code; run build" |
-| 2 | 目标未索引 | "no node matching '<target>', so this 0 is not evidence that none exist" |
+| 2 | 目标未索引 | `"no node matching '<target>', so this 0 is not evidence that none exist"` |
 | 3 | 图陈旧 + 目标未索引 | "the graph predates HEAD; run update first" |
 | 4 | 图陈旧（按提交） | "built at an older commit than HEAD; this 0 may be out of date" |
-| 5 | 图陈旧（按文件 mtime） | "<file> changed after the last build" |
+| 5 | 图陈旧（按文件 mtime） | `"<file> changed after the last build"` |
 | 6 | 已知语言盲区命中 | 见下表 |
-| 7a | 验证过的真实空缺 | "'<target>' is indexed and the graph is current, so this 0 is a real absence" |
+| 7a | 验证过的真实空缺 | `"'<target>' is indexed and the graph is current, so this 0 is a real absence"` |
 | 7b | 已索引但未验证时效 | "no such edge is recorded; graph currency unverified" |
 
 阶梯的关键在 **7a/7b 的区分**：只有当陈旧检查**真的跑过且通过**时才说"真实空缺"（`currency_verified`）；没跑过检查就只说"未记录"。措辞的强度与证据的强度严格对齐——这是整章的灵魂。
